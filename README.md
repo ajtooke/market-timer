@@ -1,0 +1,1 @@
+This project is a stock market timer algorithm testing and operating environment. It will include framework for grabbing stock prices, adding up total return with dividends of a given buy/sell model, historically validating models and plotting results, and running models for future personal use.
