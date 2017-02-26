@@ -1,16 +1,30 @@
-from datetime import datetime
+import datetime
 from yahoo_finance import Share
+from csv import DictReader
+from urllib.request import urlopen
+from io import StringIO
+import numpy as np
 import pdb
 
 class Stock:
     """Stock class that holds symbol, price history with corresponding dates, 
     dividends, and other useful info."""
 
-    data = dict()
+    def __init__(self, symbol, start_date=None, end_date=None):
 
-    def __init__(self, symbol):
         self.symbol = symbol
         self.yf_share = Share(symbol)
+        self.date = []
+        self.open_value = None
+        self.close_value = None
+        self.low = None
+        self.high = None
+        self.volume = None
+        self.adj_close = None
+        self.dividend = None
+
+        if start_date and end_date:
+            self.populate_data(start_date, end_date)
 
     def populate_data(self, start_date, end_date, mask='%Y-%m-%d'):
         """
@@ -21,29 +35,72 @@ class Stock:
         end_date: string 'yyy-mm-dd'
         """
 
-        self.start_date = datetime.strptime(start_date, mask)
-        self.end_date = datetime.strptime(end_date, mask)
+        start_date_num = [int(x) for x in start_date.split('-')]
+        end_date_num = [int(x) for x in end_date.split('-')]
+
+        self.start_date = datetime.date(start_date_num[0], start_date_num[1], start_date_num[2])
+        self.end_date = datetime.date(end_date_num[0], end_date_num[1], end_date_num[2])
 
         if self.start_date > self.end_date:
             raise ValueError('Start date "%s" is greater than "%s"' % 
                 (self.start_date, self.end_date))
 
         hist = self.yf_share.get_historical(start_date, end_date)
-        hist_div = self.yf_share.get_historical_dividends(start_date, end_date)
+        hist_div = get_dividend_history(self.symbol, self.start_date, self.end_date)
 
-        # new combined dict with first key the date, and inside a dict with 
-        # all info including dividend
-        keys_hist = ['open_value', 'close_value', 'low', 'high', 
-            'volume', 'adj_close', 'dividend']
+        # import all data to numpy arrays, and dates to a list.
+        open_value_temp = []
+        close_value_temp = []
+        low_temp = []
+        high_temp = []
+        volume_temp = []
+        adj_close_temp = []
+        dividend_temp = []
         for l in hist:
-            self.data[datetime.strptime(l['Date'], mask)] = dict(zip(keys_hist, 
-                [float(l['Open']), float(l['Close']), 
-                float(l['Low']), float(l['High']), 
-                float(l['Volume']), float(l['Adj_Close']), float(0)]))
+            date_num = [int(x) for x in l['Date'].split('-')]
+            self.date.append(datetime.date(date_num[0], date_num[1], date_num[2]))
+            open_value_temp.append(float(l['Open']))
+            close_value_temp.append(float(l['Close']))
+            low_temp.append(float(l['Low']))
+            high_temp.append(float(l['High']))
+            volume_temp.append(float(l['Volume']))
+            adj_close_temp.append(float(l['Adj_Close']))
+            
 
-        pdb.set_trace()
+        # Convert all lists to numpy arrays.
+        self.open_value = np.array(open_value_temp)
+        self.close_value = np.array(close_value_temp)
+        self.low = np.array(low_temp)
+        self.high = np.array(high_temp)
+        self.volume = np.array(volume_temp)
+        self.adj_close = np.array(adj_close_temp)
+        self.dividend = np.zeros(self.open_value.size)
 
+        # Correctly set dividends
         for l in hist_div:
-            if datetime.strptime(l['Date'], mask) in self.data:
-                self.data[datetime.strptime(l['Date'], mask)]['dividend'] = \
+            date_num = [int(x) for x in l['Date'].split('-')]
+            date_temp = datetime.date(date_num[0], date_num[1], date_num[2])
+            if date_temp in self.date:
+                self.dividend[self.date.index(date_temp)] = \
                     float(l['Dividends'])
+
+def get_dividend_history(symbol, start_date, end_date):
+    """take in start_date and end_date datetime.date objects and create the 
+    correct URL to grab csv data from. Also requires stock symbol"""
+
+    url_base = 'http://ichart.finance.yahoo.com/table.csv'
+
+    url = (url_base + '?' + 
+        's=' + symbol + '&' +
+        'a=' + str(start_date.month - 1) + '&' +
+        'b=' + str(start_date.day) + '&' +
+        'c=' + str(start_date.year) + '&' +
+        'd=' + str(end_date.month - 1) + '&' +
+        'e=' + str(end_date.day) + '&' +
+        'f=' + str(end_date.year) + '&' +
+        'g=v')
+
+    response = urlopen(url).read().decode('utf-8')
+    cr = DictReader(StringIO(response))
+
+    return cr
