@@ -49,6 +49,7 @@ class Stock:
         hist_div = get_dividend_history(self.symbol, self.start_date, self.end_date)
 
         # import all data to numpy arrays, and dates to a list.
+        date_temp = []
         open_value_temp = []
         close_value_temp = []
         low_temp = []
@@ -58,22 +59,26 @@ class Stock:
         dividend_temp = []
         for l in hist:
             date_num = [int(x) for x in l['Date'].split('-')]
-            self.date.append(datetime.date(date_num[0], date_num[1], date_num[2]))
+            date_temp.append(datetime.date(date_num[0], date_num[1], date_num[2]))
             open_value_temp.append(float(l['Open']))
             close_value_temp.append(float(l['Close']))
             low_temp.append(float(l['Low']))
             high_temp.append(float(l['High']))
             volume_temp.append(float(l['Volume']))
             adj_close_temp.append(float(l['Adj_Close']))
-            
+
+        # Ensure dates are sorted and get indices.
+        ind = [i[0] for i in sorted(enumerate(date_temp), key=lambda x:x[1])]
+
+        self.date = [date_temp[i] for i in ind]
 
         # Convert all lists to numpy arrays.
-        self.open_value = np.array(open_value_temp)
-        self.close_value = np.array(close_value_temp)
-        self.low = np.array(low_temp)
-        self.high = np.array(high_temp)
-        self.volume = np.array(volume_temp)
-        self.adj_close = np.array(adj_close_temp)
+        self.open_value = np.array([open_value_temp[i] for i in ind])
+        self.close_value = np.array([close_value_temp[i] for i in ind])
+        self.low = np.array([low_temp[i] for i in ind])
+        self.high = np.array([high_temp[i] for i in ind])
+        self.volume = np.array([volume_temp[i] for i in ind])
+        self.adj_close = np.array([adj_close_temp[i] for i in ind])
         self.dividend = np.zeros(self.open_value.size)
 
         # Correctly set dividends
