@@ -16,6 +16,9 @@ class TradingModel:
 	date = None
 
 	def __init__(self, start_date=None, end_date=None):
+		"""start_date: string 'yyyy-mm-dd'
+        end_date: string 'yyy-mm-dd' """
+
 		if start_date and end_date:
 			self.start_date = start_date
 			self.end_date = end_date
@@ -104,24 +107,53 @@ class TradingModel:
 			self.cash_after_buy_and_div[i+1] = (self.cash_before_buy_after_div[i+1] - 
 				(shares_to_buy * current_value))
 
+		self.end_of_day_value = self.cash_after_buy_and_div + self.invested_value
 
-class HoldSPY(TradingModel):
+	def plot_model_return(self):
+
+		if not (self.invested_value):
+			self.add_model_return()
+
+		# Plot various value metrics.
+
+class MACModel(TradingModel):
+	"""Moving-average crossover trading model implementation."""
+
+	def __init__(self, symbols, start_date, end_date, 
+		ema_days_low=34, ema_days_high=200, ma_days_low=40, ma_days_high=200):
+		"""symbols is a list of two symbols to apply model to -- stock fund first, then bond.
+		Start_date and end_date are same as always"""
+		super().__init__(start_date, end_date)
+		for sym in symbols:
+			self.set_stock_obj(sym)
+
+		# calculate exponential moving average alpha parameters
+		# use 99.9% of weight (0.001 not included)
+		self.alpha_low = 1 - math.exp(math.log(0.001) / ema_days_lows)
+		self.alpha_high = 1 - math.exp(math.log(0.001) / ema_days_high)
+
+		# calculate EMA for stock series
+
+
+
+
+class HoldSymbol(TradingModel):
+	"""Stock trading model that holds a given symbol."""
+
+	def __init__(self, symbol, start_date, end_date):
+		super().__init__(start_date, end_date)
+		self.set_stock_obj(symbol)
+
+		num_trading_days = len(self.stock_objs[symbol].date)
+		self.symbol_seq = [symbol for x in range(num_trading_days)]
+
+
+def hold_spy(start_date, end_date):
 	"""Stock trading model that holds SPY."""
 
-	def __init__(self, start_date, end_date):
-		super().__init__(start_date, end_date)
-		self.set_stock_obj('SPY')
-
-		num_trading_days = len(self.stock_objs['SPY'].date)
-		self.symbol_seq = ['SPY' for x in range(num_trading_days)]
+	return HoldSymbol('SPY', start_date, end_date)
 		
-class HoldIEF(TradingModel):
+def hold_ief(start_date, end_date):
 	"""Stock trading model that holds SPY."""
-
-	def __init__(self, start_date, end_date):
-		super().__init__(start_date, end_date)
-		self.set_stock_obj('IEF')
-
-		num_trading_days = len(self.stock_objs['IEF'].date)
-		self.symbol_seq = ['IEF' for x in range(num_trading_days)]
 		
+	return HoldSymbol('IEF', start_date, end_date)
