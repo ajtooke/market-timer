@@ -1,6 +1,7 @@
 from stock import Stock
 import numpy as np
 import math
+import pdb
 
 class TradingModel:
 	"""Superclass of stock trading models."""
@@ -120,7 +121,7 @@ class MACModel(TradingModel):
 	"""Moving-average crossover trading model implementation."""
 
 	def __init__(self, symbols, start_date, end_date, 
-		ema_days_low=34, ema_days_high=200, ma_days_low=40, ma_days_high=200):
+		ema_days_low=34, ema_days_high=200, ma_days_low=40, ma_days_high=200, ema_factor=1.001):
 		"""symbols is a list of two symbols to apply model to -- stock fund first, then bond.
 		Start_date and end_date are same as always"""
 		super().__init__(start_date, end_date)
@@ -129,12 +130,33 @@ class MACModel(TradingModel):
 
 		# calculate exponential moving average alpha parameters
 		# use 99.9% of weight (0.001 not included)
-		self.alpha_low = 1 - math.exp(math.log(0.001) / ema_days_lows)
-		self.alpha_high = 1 - math.exp(math.log(0.001) / ema_days_high)
+		self.alpha_low = 2 / (ema_days_low + 1)
+		self.alpha_high = 2 / (ema_days_high + 1)
 
-		# calculate EMA for stock series
+		# calculate EMAs for stock series
+		ema_low = calc_ema(self.alpha_low, self.stock_objs[symbols[0]].adj_close)
+		ema_high = calc_ema(self.alpha_high, self.stock_objs[symbols[0]].adj_close)
 
+		# calculate MAs for stock series
+		ma_low = calc_ma(ma_days_low, self.stock_objs[symbols[0]].adj_close)
+		ma_high = calc_ma(ma_days_high, self.stock_objs[symbols[0]].adj_close)
 
+		# now apply model. start off in stock model and sell when low moving average crosses
+		# below high moving average. buy when low EMA becomes greater than ema_factor * ...
+		# high EMA.
+		num_trading_days = len(self.stock_objs[symbols[0]].date)
+		self.symbol_seq = [symbols[0] for x in range(num_trading_days)]
+
+		current_sym = symbols[0]
+		for ii in range(num_trading_days):
+			# wait at least ma_days_high before doing anything.
+			if ii >= ma_days_high:
+				if ma_low[ii] < ma_high[ii]:
+					current_sym = symbols[1]
+				if ema_low[ii] > ema_factor * ema_high[ii]:
+					current_sym = symbols[0]
+
+			self.symbol_seq[ii] = current_sym
 
 
 class HoldSymbol(TradingModel):
@@ -157,3 +179,25 @@ def hold_ief(start_date, end_date):
 	"""Stock trading model that holds SPY."""
 		
 	return HoldSymbol('IEF', start_date, end_date)
+
+def calc_ema(alpha, data):
+	"""This is a helper function for calculating the exponential moving average of a numpy vector
+	of data. 
+
+	EMA_today = EMA_yesterday + alpha * (value_today - EMA_yesterday)"""
+
+	ema = np.zeros(len(data))
+
+	# initialize ema with first data point.
+	ema[0] = data[0]
+	for ii in range(1, len(data)):
+		ema[ii] = ema[ii-1] + alpha * (data[ii] - ema[ii-1])
+
+	return ema
+
+def calc_ma(N, data):
+	"""This function calculates the N-day moving average of a numpy vector of data."""
+
+	cumsum = np.cumsum(np.insert(data, 0, 0))
+
+	return (cumsum[N:] -cumsum[:-N]) / N
