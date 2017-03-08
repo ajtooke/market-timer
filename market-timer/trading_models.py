@@ -198,6 +198,6 @@ def calc_ema(alpha, data):
 def calc_ma(N, data):
 	"""This function calculates the N-day moving average of a numpy vector of data."""
 
-	cumsum = np.cumsum(np.insert(data, 0, 0))
+	w = [1.0 / N] * N
 
-	return (cumsum[N:] -cumsum[:-N]) / N
+	return np.correlate(data, w, "same")
